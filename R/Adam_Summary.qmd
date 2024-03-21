@@ -119,10 +119,9 @@ The TSR contends that growth rates for species reared under higher temperatures 
 
 > The temperature-size rule (TSR) is a widespread phenomenon, which describes the phenotypic plastic response of species’ size to temperature: individuals reared at colder temperatures mature as larger adults than at warmer temperatures.
 
-This effect IMO is better seen through anomalies, and also would not expect not operate differently between these regions.
+This effect IMO is better seen through anomalies, and I also would not expect sst anomalies to operate differently between regions since they are region-specific.
 
 ```{r}
-
 p1 <- ggplot(df) +
   geom_boxplot(aes(x = survey_area, y = sst, color = survey_area)) +
   labs(x = "Area", y = "OISST", title = "There are Different Baseline SSTs\nAmong Regions")
@@ -144,7 +143,12 @@ p4 <- ggplot(drop_na(df, ersst), aes(year, ersst_anom, color = survey_area)) +
   labs(title = "Departure from long-term trend\nstarts in 2000's", x = "Year", y = "ERSST Anomalies")
 
 
-p1 + p3 + p2 + p4 + plot_layout(ncol = 2, guides = "collect")
+(p1 + p3) + plot_layout(guides = "collect")
+```
+
+
+```{r}
+(p2 + p4) + plot_layout(guides = "collect")
 ```
 ::::
 
