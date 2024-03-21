@@ -41,7 +41,7 @@ library(rstatix)
 library(ggpubr)
 
 
-theme_set(theme_gmri())
+theme_set(theme_gmri() + theme(plot.margin = margin()) )
 
 #--------------------
 ## Set up
@@ -75,16 +75,20 @@ df <- df %>%
 
 ```
 
+
+The following tabs detail how I'm thinking about whether to use SST in celsius or Celsius as anomalies to test our hypotheses about temperature's impact on size and size structure:
+
 ::: panel-tabset
-### SST Raw
+### SST Actual
 
-Raw SST should (and does) increase with lower latitudes.
+Raw SST should (and does) increase with lower latitudes in the Northern hemisphere.
 
-The temperature size rule does not predict that the mean/median size of a community should be correlated to the ambient temperature.
+The temperature size rule does not predict that the mean/median size of a community should be correlated to the ambient temperature. Though this may be the case, this is not what it contends with directly, or that is not my understanding of it.
 
-> The temperature-size rule (TSR) is a widespread phenomenon, which describes the phenotypic plastic response of species’ size to temperature: individuals reared at colder temperatures mature as larger adults than at warmer temperatures.
 
-Though this may be the case, this is not what it contends with directly, or that is not my understanding of it. I am operating under an assumption that each region is composed of individuals that on-average are living under temperatures that would not be considered "colder" or "warmer" than their preference.
+My thinking is that each regional community is likely composed of individuals that on-average are living near temperatures that are neither significantly "colder" or "warmer" than their preference. If there are mean/median differences in size, then I don't think it is a manifestation of the TSR.
+
+
 
 ```{r}
 p1 <- ggplot(df) +
@@ -109,9 +113,11 @@ p1 + p2 + p3 + guide_area() + plot_layout(ncol = 2, guides = "collect")
 
 ### SST as Anomalies
 
-Anomalies are based off a 30-year climatology for each respective region, and should capture departures from the long-term average. This also helps out with a problem of modeling SST x Region interactions, where the distributions of sst for the regions do not overlap well. In other words, the mid-Atlantic Bight is always warmer than southern new england, which is usually warmer than Georges or GOM.
+Anomalies are based off a 30-year climatology for each respective region, and should capture departures from the long-term average. This helps out with a problem of modeling SST x Region interactions, where the distributions of sst for the regions do not overlap well. 
 
 The TSR contends that growth rates for species reared under higher temperatures show a plastic response where growth rates at early ages are elevated, and maturation happens earlier and at smaller sizes.
+
+> The temperature-size rule (TSR) is a widespread phenomenon, which describes the phenotypic plastic response of species’ size to temperature: individuals reared at colder temperatures mature as larger adults than at warmer temperatures.
 
 This effect IMO is better seen through anomalies, and also would not expect not operate differently between these regions.
 
@@ -140,6 +146,12 @@ p4 <- ggplot(drop_na(df, ersst), aes(year, ersst_anom, color = survey_area)) +
 
 p1 + p3 + p2 + p4 + plot_layout(ncol = 2, guides = "collect")
 ```
+::::
+
+
+These next plots explore the degree that SST anomalies are correlated with median size and spectra slope, and thoughts on what that relationship could/should be operating.
+
+::: panel-tabset
 
 ### SST Anomalies and Size Structure
 
@@ -170,7 +182,7 @@ p3 <- ggplot(df, aes(sst_anom, b)) +
 p1 + p2 + p3 + guide_area() + plot_layout(ncol = 2, guides = "collect") + plot_annotation(title = "SST anomalies show no global correlation, could be an interaction situation, could be nothing...")
 ```
 
-### Region x Anomaly Interaction
+### Region x SST Anomaly Interactions
 
 Its possible that maybe the regions would have some differential response. However, I wouldn't anticipate them to behave differently under expectations from the TSR.
 
@@ -197,7 +209,7 @@ p1 + p2 + p3 + guide_area() + plot_layout(ncol = 2, guides = "collect") + plot_a
 ```
 
 
-### Exploring SST Anomalies as Non-Linear Response
+### SST Anomalies as Non-Linear Response
 
 I would almost expect SST anomalies to have a non-linear response shape of some dome-like shape mirroring a thermal preference curve.
 
@@ -213,31 +225,35 @@ ggplot(df, aes(sst_anom, b, color = survey_area)) +
 
 :::
 
+
+
 # Should we Drop SST/SST Anomalies?
 
-From Bart: \
+So we know that using SST itself has some problems: \
+ 1. SST from different regions have poor overlap  \
+ 2. SST is colinear with the passage of time and with the declines in landings
+
+**From Bart:** \
 
 > Therefore, I think the best approach is to drop SST and focus on year as the predictor (and a proxy for SST).
 
-My Thoughts: \
+**My Thoughts:** \
 Why would we want a proxy for SST when we have SST? Wouldn't it be more prudent to make a statement on a lack of SST's association with median size and spectra slope?
 
 > Including region and year brings in additional complications of collinearity. Each of the other variables shows trends through time. While it would be possible to follow a differencing procedure (e.g. remove the temporal trend) in these variables, I think a simpler and must easier approach is to just include year as both a predictor and a random effect, and remove all other covariates. What we are doing here is assuming that there is lots of stuff that differs with year, but we are going to push all that variation into the random effect component of the model in order to focus on the temporal trends by region.
 
-My Thoughts: \
+**My Thoughts:** \
 I can see some of the rationale of going this route for the convenience of navigating the multicollineary of time+sst+landings. 
 
-But this option is probably the furthest from testing a hypothesis for either landings or SST. 
+To me, this option does not test either hypotheses for either landings or SST. I believe we'd have a decent model in terms of unbiased predictions and decent performance, but it seems like kind of a hands in the air for our original hypotheses and just focusing on whether there were changes over time.
 
-I believe we'd have a decent model in terms of unbiased predictions and decent performance, but it seems like kind of a hands in the air for our original hypotheses and just focusing on whether there were changes over time.
+
+
+
+
+### Exploring years as a Random Effect
 
 I'm also confused whether you can/should use year both as a fixed and a random. And also whether you are using it as a continuous variable for fixed and intended to use it as a categorical variable in the random effects term. I don't think random effects can be continuous variables.
-
-
-
-### Year as a Random Effect
-
-I'm confused how year is being treated when it is in the model as a fixed term AND a random intercept term:
 
 The model formula you had in your summary resembles what I would anticipate for having "year" as a continuous fixed effect.
 
@@ -259,7 +275,7 @@ p1 <- as.data.frame(cont$emtrends) %>%
 p2 <- plot(ggpredict(mod_regionXyear, ~year+survey_area), add.data = T) + 
   ggtitle("Model Formula:\nyear * region + (1 | year)")
 
-p1 | p2
+p1 / p2
 ```
 
 This is what I imagine a random effect for year would produce.
@@ -282,7 +298,7 @@ p1 <- as.data.frame(cont$emtrends) %>%
 p2 <- plot(ggpredict(mod_regionXyear, ~year+survey_area), add.data = T) + 
   ggtitle("Model Formula:\nyear * region + (1 | factor(year))")
 
-p1 | p2
+p1 / p2
 ```
 
 
@@ -304,7 +320,7 @@ p1 <- as.data.frame(simple_cont$emtrends) %>%
 
 p2 <- plot(ggpredict(simple_mod, ~year+survey_area), add.data = T) + ggtitle("Model Formula:\nyear * region")
 
-p1 | p2
+p1 / p2
 
 ```
 
@@ -655,7 +671,7 @@ ggplot(df_aug) +
 
 ---
 
-# Supplemental Test 2: Have Regions Seen Changes in Slope/Size
+# Testing Change Over Time: Have Regions Seen Changes in Slope/Size
 
 This would be preliminary/supplemental exploration of whether median size or size spectra slopes have changed within regions.
 
@@ -671,20 +687,20 @@ These would be straightforward linear models with a region interaction. They pro
 # Need a slope/intercept  interaction between year and region
 length_change_lm <- lm(med_len ~ year * region, data = df)
 
-# Test homegeneity of slopes - for ANCOVA
-df %>% anova_test(med_len ~ region * year)
+# # Test homegeneity of slopes - for ANCOVA
+# df %>% anova_test(med_len ~ region * year)
 
 # They aren't homogenous - pairwise test for differences
 slopes_lst <- emtrends(length_change_lm, ~ region, var = "year")
-slopes_lst %>% gt()          # slope estimates and CIs
-pairs(slopes_lst) %>% gt()   # comparisons
+slopes_lst %>% as.data.frame() %>%  gt()          # slope estimates and CIs
+pairs(slopes_lst) %>% as.data.frame() %>% gt()   # comparisons
 
 
 #---- below might depend on slope assumption  ------
 
 # ANOVA test for between significance
 res.aov <- df %>% anova_test(med_len ~ year + region)
-get_anova_table(res.aov)
+get_anova_table(res.aov)  %>% as.data.frame() %>% gt()
 
 
 # Pairwise comparisons
@@ -743,8 +759,8 @@ df %>% anova_test(b ~ region * year)
 
 # They aren't homogenous - pairwise test for differences
 slopes_lst <- emtrends(b_change_lm, ~ region, var = "year")
-slopes_lst %>% gt()          # slope estimates and CIs
-pairs(slopes_lst) %>% gt()   # comparisons
+slopes_lst  %>% as.data.frame() %>% gt()         # slope estimates and CIs
+pairs(slopes_lst)  %>% as.data.frame() %>% gt()   # comparisons
 
 
 
@@ -753,7 +769,7 @@ pairs(slopes_lst) %>% gt()   # comparisons
 
 # ANOVA test for between significance
 res.aov <- df %>% anova_test(b ~ year + region)
-get_anova_table(res.aov)
+get_anova_table(res.aov)   %>% as.data.frame() %>% gt()
 
 
 # Pairwise comparisons
@@ -796,7 +812,7 @@ get_emmeans(pwc) %>%
   labs(
     subtitle = get_test_label(res.aov, detailed = TRUE),
     caption = get_pwc_label(pwc)) +
-  labs(y = "Median Length (cm)", x = "Region")
+  labs(y = "Exponent of Size Spectra (b)", x = "Region")
 ```
 
 
