@@ -565,6 +565,8 @@ ggplot(length_rolling_preds) +
 plot(ggpredict(length_all_methods,  ~ survey_area))        
 plot(ggpredict(length_all_methods,  ~ year * survey_area)) 
 
+
+
 # #ERSST
 # plot(ggpredict(spectra_lm,  ~ ersst_anom * survey_area))
 # plot(ggpredict(spectra_lm,  ~ gsi_ersst_resid))

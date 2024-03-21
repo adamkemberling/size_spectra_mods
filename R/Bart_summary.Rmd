@@ -1,0 +1,160 @@
+---
+title: "BD_Summary"
+output: html_document
+date: "2024-03-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, include = F)
+```
+
+```{r}
+library(tidyverse)
+library(DHARMa)
+library(glmmTMB)
+library(ggeffects)
+library(RcppRoll)
+library(lme4)
+library(lmerTest)
+
+#--------------------
+## Set up
+#--------------------
+
+df <- read.csv("data/cleaned_raw.csv") %>% 
+  group_by(region) %>%
+  arrange(region, year) %>%
+  mutate(sst_5 = roll_mean(sst, n = 5, align = "right", fill = c(NA,NA,NA)), 
+         landings_5 = roll_mean(landings, n = 5, align = "right", fill = c(NA,NA,NA)))
+```
+
+
+## Sea Surface Temperature Story
+
+Across the Northeast U.S. shelf, we see declines in the ISD slope and median body size with temperature (when temperature is represented as a 5 rolling average).
+
+```{r include = T}
+
+mod_noregion <- lmer(b ~ scale(log(landings_5)) + scale(zp_small) + scale(gsi) + scale(sst_5) + (1|year), data = df)
+
+pred1 <- as.data.frame(ggpredict(mod_noregion, ~sst_5))
+
+ggplot(df, aes(x = sst_5, y = b))+
+  geom_point(aes(color = region))+
+  geom_ribbon(data = pred1, aes(x = x, y = predicted, ymin = conf.low, ymax = conf.high ), alpha = 0.5)+
+  geom_line(data = pred1, aes(x = x, y = predicted))+
+  labs(x = "Temperature (C, 5-year rolling mean)", y = "ISD slope")+
+  theme_classic()
+
+
+
+```
+
+This reflects the fact that more southerly waters are warmer (*on average*) and have fish communities with smaller median body size and greater (more negative) ISD slopes (indicating fewer large individuals). VIF() of the above model suggests no issues with collinearity (vif < 2). The relationship between sst and ISD may be nonlinear, and a gam fit to the same data reveals the same patterns (Strong negative effect of temp, negative effects of zp_small, although that effect appears noise and linear). 
+
+```{r include = T}
+gam_noregion <- mgcv::gam(b ~ s(sst_5) + s(landings_5) + s(gsi) + s(zp_small), data = df, method = "REML")
+
+pred2 <- as.data.frame(ggpredict(gam_noregion, ~sst_5))
+
+ggplot(df, aes(x = sst_5, y = b))+
+  geom_point(aes(color = region))+
+  geom_ribbon(data = pred2, aes(x = x, y = predicted, ymin = conf.low, ymax = conf.high ), alpha = 0.5)+
+  geom_line(data = pred2, aes(x = x, y = predicted))+
+  labs(x = "Temperature (C, 5-year rolling mean)", y = "ISD slope")+
+  theme_classic()
+```
+
+This is also evidence of a negative effect of small zooplankton abundance on ISD slope. But I havent' tried to unpack that yet. Here I've plotted the effects for ISD slope but the results for median body weight are extremely similar (which could be a reason to just push all that to the supplement also). 
+
+The implications of these figures do NOT address whether increases in temperature with climate change are associated with declines in body size. SST is increasing through time in each region, with previous analyses showing that SST is increasing the fastest in the GOM. Therefore we would expect the body size to decline with time (year) the fastest in the Gulf of Maine, or similarly with SST the fastest in the GOM relative to other regions.
+
+Here is a crude plot of sst time series with linear trends. 
+
+```{r include = T}
+
+df.cor <- df %>% 
+  mutate(region.f = as.factor(region), 
+         year.int = as.integer(year))
+
+mod_sstXyear <- nlme::gls(sst ~ region*year, data = df.cor, correlation = nlme::corAR1(form =  ~year.int|region.f))
+
+# summary(mod_sstXyear)
+plot(ggpredict(mod_sstXyear, ~year*region),add.data = T)
+
+
+
+```
+
+From a modeling perspective, modeling y ~ SST*region is problematic, because there is little overlap in the distributions of SST X region. In other words, the mid-Atlantic Bight is always warmer than southern new england, which is usually warmer than Georges or GOM. 
+
+Therefore, I think the best approach is to drop SST and focus on year as the predictor (and a proxy for SST). Including region and year brings in additional complications of collinearity. Each of the other variables shows trends through time. While it would be possible to follow a differencing procedure (e.g. remove the temporal trend) in these variables, I think a simpler and must easier approach is to just include year as both a predictor and a random effect, and remove all other covariates. What we are doing here is assuming that there is lots of stuff that differs with year, but we are going to push all that variation into the random effect component of the model in order to focus on the temporal trends by region. 
+
+```{r include = T}
+
+mod_regionXyear <- lmer(b ~ year*region + (1|year), data = df)
+
+cont <- emmeans::emtrends(mod_regionXyear, pairwise ~ region, var = "year")
+
+as.data.frame(cont$emtrends) %>%
+  ggplot(aes(y = region, x = year.trend))+
+  geom_pointrange(aes(xmin = lower.CL, xmax = upper.CL))+
+  geom_vline(xintercept = 0, linetype = 4)+
+  labs(x = "Coefficient value", y = "")+
+  theme_classic()
+
+```
+
+Here is a figure of the slope estimate for each region. We can see that Georges has a negative slope. The slopes of the GOM and SNE do not differ from Georges, but the confidence intervals include zero. 
+
+Here is a figure of the actual trends. 
+
+```{r include = T}
+plot(ggpredict(mod_regionXyear, ~year+region), add.data = T)
+```
+
+we see that, indeed, Georges, GOM, and Southern New England are declining (slopes on Georges--the reference--is negative, SNE and GOM don't differ from Georges). However, we see an interesting INCREASE in the ISD slope through time (relatively more big stuff) in the southern most region (the Mid-Atlantic Bight). Why might this be the case? Is there any particularly large species that appear later in the time series? The same general pattern holds for median body weight, although the pattern isn't as strong.
+
+## Landings story
+
+At the basin scale, we see little pattern between landings and bodysize. Landings does not appear to be correlated with either the ISD slope or median body weight at the basin scale. In the basin scale model, I have included both SST and landings, and there is not evidence of multicollinearity in the residuals (e.g. vif < 2).
+
+Within regions, landings have declined considerably in the GOM, GB, and SNE through time. Landings in the MAB have fluctuated, largely due to landings of menhaden (I suspect).
+
+```{r include = T}
+ggplot(df, aes(x = year, y = landings))+
+  geom_point(aes(color = region))+
+  geom_smooth(aes(color = region))+
+  facet_wrap(~region, scales = "free")
+```
+
+
+Here is what is interesting, we found that body size has declined on GB, GOM, and SNE. Over that same time period sst has increased in all regions (confirming the hypothesis that higher temps lead to smaller body sizes). However, landings have declined in the three regions where body size has declined. If our hypothesis that higher landings leads to smaller body sizes is TRUE, then we should expect that declining fishing pressure increases body sizes (less negative ISD slope, larger median body weight). So to me the data suggests that we have two opposing forces operating on community body size. We have temporal increases in temperature leading to declines in body size, and temporal decreases in harvest pressure leading to increases in body size. However, what we are seeing is that in the three regions where harvest pressure is declining (and in the three regions where water is warming the fastest), body size is declining. 
+
+This suggests to me that either: 
+
+1) harvest is not a strong selective force for smaller body sizes from 1986-2019 in the Northwestern Atlantic. 
+
+OR 
+
+2) Reductions in harvest are indeed weakening harvest induced declines in body size, but the potential increases in body size due to lower harvest are masked by increases in temperature. 
+
+AND
+
+3) The data offers evidence that declines in body size in the fish community in the Northwest Atlantic are due to increases in sst over the last ~40 years.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
