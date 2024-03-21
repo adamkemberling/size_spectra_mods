@@ -124,23 +124,23 @@ This effect IMO is better seen through anomalies, and I also would not expect ss
 ```{r}
 p1 <- ggplot(df) +
   geom_boxplot(aes(x = survey_area, y = sst, color = survey_area)) +
-  labs(x = "Area", y = "OISST", title = "There are Different Baseline SSTs\nAmong Regions")
+  labs(x = "Area", y = "OISST", subtitle = "There are Different Baseline SSTs\nAmong Regions")
 
 p2 <- ggplot(df, aes(x = survey_area, y = sst_anom, color = survey_area)) + 
   geom_boxplot() +
-  labs(title = "Anomalies (or scaled values)\nFrame in terms of regional average", x = "Area", y = "OISST Anomaly")
+  labs(subtitle = "Anomalies (or scaled values)\nFrame in terms of regional average", x = "Area", y = "OISST Anomaly")
 
 
 p3 <- ggplot(drop_na(df, sst), aes(year, sst_anom, color = survey_area)) +
   geom_point(alpha = 0.4) +
   geom_smooth(se = F, linewidth = 1) +
-  labs(title = "All regions have elevated\nSST conditions in last decade", x = "Year", y = "OISST Anomalies")
+  labs(subtitle = "All regions have elevated\nSST conditions in last decade", x = "Year", y = "OISST Anomalies")
 
 
 p4 <- ggplot(drop_na(df, ersst), aes(year, ersst_anom, color = survey_area)) +
   geom_point(alpha = 0.4) +
   geom_smooth(se = F, linewidth = 1) +
-  labs(title = "Departure from long-term trend\nstarts in 2000's", x = "Year", y = "ERSST Anomalies")
+  labs(subtitle = "Departure from long-term trend\nstarts in 2000's", x = "Year", y = "ERSST Anomalies")
 
 
 (p1 + p3) + plot_layout(guides = "collect")
